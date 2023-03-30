@@ -1,31 +1,48 @@
-version: '3.7'
+version: "3.9"
 
 services:
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.16.2
-    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.2.2
     environment:
-      - node.name=elasticsearch
-      - cluster.name=docker-cluster
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - ELASTIC_PASSWORD=YOUR_PASSWORD_HERE
+      - xpack.security.enabled=true
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.verification_mode=certificate
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
     ports:
       - "9200:9200"
-    volumes:
-      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - elastic
+    command: >
+      bash -c "
+        /usr/local/bin/docker-entrypoint.sh elasticsearch -p /usr/share/elasticsearch/elasticsearch.pid
+        & sleep 30
+        /usr/share/elasticsearch/bin/elasticsearch-setup-passwords auto --batch
+        "
 
   kibana:
-    image: docker.elastic.co/kibana/kibana:7.16.2
-    container_name: kibana
+    image: docker.elastic.co/kibana/kibana:8.2.2
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: elastic
+      ELASTICSEARCH_PASSWORD: YOUR_PASSWORD_HERE
     ports:
       - "5601:5601"
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - elastic      
 
 volumes:
-  esdata:
+  es_data:
     driver: local
+
+networks:
+  elastic:
+    name: elastic
+    driver: bridge
